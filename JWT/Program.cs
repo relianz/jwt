@@ -38,8 +38,15 @@ public class Program
 		}
 		else
 		{
+			string assetKeyPath = null;
+
+			string machine = Environment.MachineName;
+			if (machine.Equals( "SANTACLARA" ))
+				assetKeyPath = @"E:\temp\200131 C2 Testbed\200201 asset private key.txt";
+			else
+				assetKeyPath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
+
 			// Create RSA key from private key file:
-			const string assetKeyPath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
 			rsaKey = SecurityKeyFromPemFile( assetKeyPath );
 		}
 
