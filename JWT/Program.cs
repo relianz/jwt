@@ -1,14 +1,18 @@
 ﻿using static System.Console;
 using static System.Convert;
 
-using System;                           // DateTime, Convert, Base64FormattingOptions, Environment
-using System.IO;                        // File
-using System.Text;                      // StringBuilder
-using System.Collections.Generic;       // IEnumerable
-using System.Security.Cryptography;     // RSACryptoServiceProvider
-using System.Security.Claims;           // ClaimsIdentity, Claim
-using System.IdentityModel.Tokens.Jwt;	// JwtSecurityTokenHandler
-using Microsoft.IdentityModel.Tokens;   // SecurityTokenDescriptor, SigningCredentials, SymmetricSecurityKey
+using System;								// DateTime, Convert, Base64FormattingOptions, Environment
+using System.IO;							// File
+using System.Text;							// StringBuilder
+using System.Collections.Generic;			// IEnumerable
+using System.Security.Cryptography;			// RSACryptoServiceProvider
+using System.Security.Claims;				// ClaimsIdentity, Claim
+using System.IdentityModel.Tokens.Jwt;		// JwtSecurityTokenHandler
+using Microsoft.IdentityModel.Tokens;       // SecurityTokenDescriptor, SigningCredentials, SymmetricSecurityKey
+
+using Org.BouncyCastle.OpenSsl;             // PemReader
+using Org.BouncyCastle.Crypto;              // AsymmetricCipherKeyPair
+using Org.BouncyCastle.Crypto.Parameters;   // RsaPrivateCrtKeyParameters
 
 public class Program
 {
@@ -17,13 +21,28 @@ public class Program
 		var tokenHandler = new JwtSecurityTokenHandler();
 		var now = DateTime.UtcNow;
 
-		// Create RSA key:
-		const int keySize = 2048;
-		RsaSecurityKey rsaKey = GenerateRsaCryptoServiceProviderKey( keySize );
+		const bool generateKeyPair = false;
+		RsaSecurityKey rsaKey = null;
 
-		// Dump RSA key parts:
-		const string path = @"C:\Users\mstulle\source\repos\jwt\testbed\200127_RSA_PubKey.txt";
-		DumpRsaPublicKey( rsaKey, path );
+		if ( generateKeyPair )
+		{
+			// Create RSA key:
+			const int keySize = 2048;
+			rsaKey = GenerateRsaCryptoServiceProviderKey( keySize );
+
+			// Dump RSA key parts:
+			const string path = @"C:\Users\mstulle\source\repos\jwt\testbed\200127_RSA_PubKey.txt";
+			DumpRsaPublicKey4Python(rsaKey, path);
+			DumpRsaPublicKey(rsaKey);
+		}
+		else
+		{
+			// Create RSA from private key file:
+			const string path = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
+			rsaKey = SecurityKeyFromPemFile( path );
+		}
+
+		// Show private part of RSA key pair:
 		DumpRsaPrivateKey( rsaKey );
 
 		// Specify JWT:
@@ -31,7 +50,7 @@ public class Program
 		{
 			Subject = new ClaimsIdentity( new[]
 			{
-				new Claim( "email", "mstulle@deloitte.de" )
+				new Claim( "email", "markus@stulle.zone" )
 			}),
 			Expires = now.AddMinutes( 60 ),
 			SigningCredentials = new SigningCredentials( rsaKey, SecurityAlgorithms.RsaSha256 ),
@@ -59,10 +78,10 @@ public class Program
 
 	} // GenerateRsaCryptoServiceProviderKey.
 
-	static private void DumpRsaPublicKey( RsaSecurityKey key, string filePath )
+	static private void DumpRsaPublicKey4Python( RsaSecurityKey key, string filePath )
 	{
 		const string pemPubKeyBegin = @"-----BEGIN PUBLIC KEY-----\n";
-		const string pemPubKeyEnd = @"\n-----END PUBLIC KEY-----\n";
+		const string pemPubKeyEnd = @"\n-----END PUBLIC KEY-----";
 
 		byte[] pubKeyBytes = key.Rsa.ExportRSAPublicKey();
 		string pubKeyString = ToBase64String( pubKeyBytes, 0, pubKeyBytes.Length, Base64FormattingOptions.InsertLineBreaks );
@@ -74,7 +93,22 @@ public class Program
 		// Create/overwrite public key file:
 		File.WriteAllText( filePath, s );
 		
-		WriteLine( "\nPublic key:\n{0}", s );
+		WriteLine( "\nPublic key, Python format:\n{0}", s );
+
+	} // DumpRsaPublicKey4Python.
+
+	static private void DumpRsaPublicKey(RsaSecurityKey key)
+	{
+		const string pemPubKeyBegin = "-----BEGIN PUBLIC KEY-----\n";
+		const string pemPubKeyEnd = "\n-----END PUBLIC KEY-----";
+
+		byte[] pubKeyBytes = key.Rsa.ExportRSAPublicKey();
+		string pubKeyString = ToBase64String(pubKeyBytes, 0, pubKeyBytes.Length, Base64FormattingOptions.InsertLineBreaks);
+
+		StringBuilder builder = new StringBuilder();
+		builder.Append(pemPubKeyBegin).Append(pubKeyString).Append(pemPubKeyEnd);
+		
+		WriteLine( "\nPublic key:\n{0}", builder.ToString()	);
 
 	} // DumpRsaPublicKey.
 
@@ -135,5 +169,33 @@ public class Program
 		}
 
 	} // ValidateJwt.
+
+	public static RsaSecurityKey SecurityKeyFromPemFile( String filePath )
+	{
+		using (TextReader privateKeyTextReader = new StringReader(File.ReadAllText(filePath)))
+		{
+			AsymmetricCipherKeyPair readKeyPair = (AsymmetricCipherKeyPair)new PemReader(privateKeyTextReader).ReadObject();
+
+			RsaPrivateCrtKeyParameters privateKeyParams = ((RsaPrivateCrtKeyParameters)readKeyPair.Private);
+			RSACryptoServiceProvider cryptoServiceProvider = new RSACryptoServiceProvider();
+			RSAParameters parms = new RSAParameters();
+
+			parms.Modulus = privateKeyParams.Modulus.ToByteArrayUnsigned();
+			parms.P = privateKeyParams.P.ToByteArrayUnsigned();
+			parms.Q = privateKeyParams.Q.ToByteArrayUnsigned();
+			parms.DP = privateKeyParams.DP.ToByteArrayUnsigned();
+			parms.DQ = privateKeyParams.DQ.ToByteArrayUnsigned();
+			parms.InverseQ = privateKeyParams.QInv.ToByteArrayUnsigned();
+			parms.D = privateKeyParams.Exponent.ToByteArrayUnsigned();
+			parms.Exponent = privateKeyParams.PublicExponent.ToByteArrayUnsigned();
+
+			cryptoServiceProvider.ImportParameters( parms );
+			RsaSecurityKey key = new RsaSecurityKey( cryptoServiceProvider );
+
+			return key;
+
+		} // using.
+
+	} // SecurityKeyFromPemFile.
 
 } // class Program. 
