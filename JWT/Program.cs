@@ -10,6 +10,7 @@ using System.Security.Claims;               // ClaimsIdentity, Claim
 using System.IdentityModel.Tokens.Jwt;      // JwtSecurityTokenHandler
 using Microsoft.IdentityModel.Tokens;       // SecurityTokenDescriptor, SigningCredentials, SymmetricSecurityKey
 
+using Org.BouncyCastle.Security;            // DotNetUtilities
 using Org.BouncyCastle.OpenSsl;             // PemReader
 using Org.BouncyCastle.Crypto;              // AsymmetricCipherKeyPair
 using Org.BouncyCastle.Crypto.Parameters;   // RsaPrivateCrtKeyParameters
@@ -37,9 +38,9 @@ public class Program
 		}
 		else
 		{
-			// Create RSA from private key file:
-			const string path = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
-			rsaKey = SecurityKeyFromPemFile( path );
+			// Create RSA key from private key file:
+			const string assetKeyPath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
+			rsaKey = SecurityKeyFromPemFile( assetKeyPath );
 		}
 
 		// Show private part of RSA key pair:
@@ -172,29 +173,19 @@ public class Program
 
 	public static RsaSecurityKey SecurityKeyFromPemFile( String filePath )
 	{
-		using (TextReader privateKeyTextReader = new StringReader(File.ReadAllText(filePath)))
+		using (TextReader privateKeyTextReader = new StringReader( File.ReadAllText( filePath ) ) )
 		{
-			AsymmetricCipherKeyPair readKeyPair = (AsymmetricCipherKeyPair)new PemReader(privateKeyTextReader).ReadObject();
+			PemReader pr = new PemReader( privateKeyTextReader );
+			AsymmetricCipherKeyPair keyPair = (AsymmetricCipherKeyPair)pr.ReadObject();
+			RSAParameters rsaParams = DotNetUtilities.ToRSAParameters( (RsaPrivateCrtKeyParameters)keyPair.Private );
 
-			RsaPrivateCrtKeyParameters privateKeyParams = ((RsaPrivateCrtKeyParameters)readKeyPair.Private);
-			RSACryptoServiceProvider cryptoServiceProvider = new RSACryptoServiceProvider();
-			RSAParameters parms = new RSAParameters();
-
-			parms.Modulus = privateKeyParams.Modulus.ToByteArrayUnsigned();
-			parms.P = privateKeyParams.P.ToByteArrayUnsigned();
-			parms.Q = privateKeyParams.Q.ToByteArrayUnsigned();
-			parms.DP = privateKeyParams.DP.ToByteArrayUnsigned();
-			parms.DQ = privateKeyParams.DQ.ToByteArrayUnsigned();
-			parms.InverseQ = privateKeyParams.QInv.ToByteArrayUnsigned();
-			parms.D = privateKeyParams.Exponent.ToByteArrayUnsigned();
-			parms.Exponent = privateKeyParams.PublicExponent.ToByteArrayUnsigned();
-
-			cryptoServiceProvider.ImportParameters( parms );
-			RsaSecurityKey key = new RsaSecurityKey( cryptoServiceProvider );
+			RSACryptoServiceProvider csp = new RSACryptoServiceProvider();
+			csp.ImportParameters( rsaParams );
+			RsaSecurityKey key = new RsaSecurityKey( csp );
 
 			return key;
 
-		} // using.
+		} // using TextReader instance.
 
 	} // SecurityKeyFromPemFile.
 
