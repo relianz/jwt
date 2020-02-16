@@ -1,6 +1,26 @@
-﻿namespace Relianz.Crypto
-{
+﻿/*
+	The MIT License
 
+	Copyright 2020, Dr.-Ing. Markus A. Stulle, München (markus@stulle.zone)
+
+	Permission is hereby granted, free of charge, to any person obtaining a copy of this software 
+	and associated documentation files (the "Software"), to deal in the Software without restriction, 
+	including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+	and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, 
+	subject to the following conditions:
+
+	The above copyright notice and this permission notice shall be included in all copies 
+	or substantial portions of the Software.
+
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+	INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+	WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
+	OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+namespace Relianz.Crypto
+{
 	using static System.Console;
 	using static System.Convert;
 
@@ -22,31 +42,36 @@
 	{
 		public static void Main()
 		{
-			var tokenHandler = new JwtSecurityTokenHandler();
-			var now = DateTime.UtcNow;
+			string source;
 
-			CompareSha256Implementations();
+			// Compare SHA-256 implementations from .NET Core and in source:
+			source = "";
+			CompareSha256Implementations( source );
 
-			const bool generateKeyPair = false;
+			source = "IoT Capability - on the leading edge of technology!";
+			CompareSha256Implementations( source );
+
+			bool generateKeyPair = false;
 			RsaSecurityKey rsaKey = null;
+			int keySize = -1;
 
 			if ( generateKeyPair )
 			{
 				// Create RSA key:
-				const int keySize = 2048;
+				keySize = 2048;
 				rsaKey = GenerateRsaCryptoServiceProviderKey( keySize );
 
 				// Dump RSA key parts:
 				const string path = @"C:\Users\mstulle\source\repos\jwt\testbed\200127_RSA_PubKey.txt";
-				DumpRsaPublicKey4Python(rsaKey, path);
-				DumpRsaPublicKey(rsaKey);
+				DumpRsaPublicKey4Python( rsaKey, path );
+				DumpRsaPublicKey( rsaKey );
 			}
 			else
 			{
 				string assetKeyPath = null;
 
 				string machine = Environment.MachineName;
-				if (machine.Equals( "SANTACLARA" ))
+				if ( machine.Equals( "SANTACLARA" ) )
 					assetKeyPath = @"E:\temp\200131 C2 Testbed\200201 asset private key.txt";
 				else
 					assetKeyPath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
@@ -55,10 +80,12 @@
 				rsaKey = SecurityKeyFromPemFile( assetKeyPath );
 			}
 
-			// Show private part of RSA key pair:
+			// Show private part of RSA key pair!
+			// Never do that in real world applications!
 			DumpRsaPrivateKey( rsaKey );
 
-			// Specify JWT:
+			// Specify JWT to be signed with private key:
+			var now = DateTime.UtcNow;
 			var tokenDescriptor = new SecurityTokenDescriptor
 			{
 				Subject = new ClaimsIdentity( new[]
@@ -69,7 +96,8 @@
 				SigningCredentials = new SigningCredentials( rsaKey, SecurityAlgorithms.RsaSha256 ),
 			};
 
-			// Generate JWT:
+			// Generate JWT using framework class:
+			var tokenHandler = new JwtSecurityTokenHandler();
 			var token = tokenHandler.CreateToken( tokenDescriptor );
 			var tokenString = tokenHandler.WriteToken( token );
 
@@ -185,14 +213,23 @@
 
 		public static RsaSecurityKey SecurityKeyFromPemFile( String filePath )
 		{
+			// Employ text reader to read PEM file content:
 			using (TextReader privateKeyTextReader = new StringReader( File.ReadAllText( filePath ) ) )
 			{
+				// Create PEM content processor from Bouncy Castle:
 				PemReader pr = new PemReader( privateKeyTextReader );
+
+				// Read private part of asymmetric key from file:
 				AsymmetricCipherKeyPair keyPair = (AsymmetricCipherKeyPair)pr.ReadObject();
+
+				// Construct RSA parameters using private key data:
 				RSAParameters rsaParams = DotNetUtilities.ToRSAParameters( (RsaPrivateCrtKeyParameters)keyPair.Private );
 
+				// Feed RSA cyrptographic provider with parameters:
 				RSACryptoServiceProvider csp = new RSACryptoServiceProvider();
 				csp.ImportParameters( rsaParams );
+
+				// Access private key part from provider:
 				RsaSecurityKey key = new RsaSecurityKey( csp );
 
 				return key;
@@ -201,40 +238,45 @@
 
 		} // SecurityKeyFromPemFile.
 
-		public static void CompareSha256Implementations()
+		public static void CompareSha256Implementations( string source )
 		{
-			string source = "IoT Capability - on the leading edge of technology!";
-			using (SHA256 sha256Hash = SHA256.Create())
+			Console.WriteLine( $"\nSource string to be SHA-256 hashed: <{source}>" );
+
+			string hashA; 
+			string hashB;
+
+			// Compute hash using .NET Core implemenatation:
+			using( SHA256 sha256Hash = SHA256.Create() )
 			{
-				string hash = GetHash( sha256Hash, source );
-				Console.WriteLine( $"The .NET Core SHA256 class hash is: {hash}." );
+				hashA = GetHash( sha256Hash, source );
+				Console.WriteLine( $"The .NET Core SHA256 class hash is: <{hashA}>" );
 			}
 
-			string hash2 = Sha2.GetHash(source);
-			Console.WriteLine( $"The in source implemented hash is:  {hash2}." );
+			// Compute hash using in source implemenatation:
+			hashB = Sha2.GetHash( source );
+			Console.WriteLine( $"The in source implemented hash is:  <{hashB}>" );
 
 		} // CompareSha256Implementations.
 
 		private static string GetHash( HashAlgorithm hashAlgorithm, string input )
 		{
 
-			// Convert the input string to a byte array and compute the hash.
-			byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(input));
+			// Convert the input string to a byte array and compute the hash:
+			byte[] data = hashAlgorithm.ComputeHash( Encoding.UTF8.GetBytes( input ) );
 
-			// Create a new Stringbuilder to collect the bytes
-			// and create a string.
+			// Create a new Stringbuilder to collect the bytes and create a string:
 			var sBuilder = new StringBuilder();
 
-			// Loop through each byte of the hashed data 
-			// and format each one as a hexadecimal string.
-			for (int i = 0; i < data.Length; i++)
+			// Loop through each byte of the hashed data and format each one as a hexadecimal string:
+			for( int i = 0; i < data.Length; i++ )
 			{
-				sBuilder.Append(data[i].ToString("x2"));
+				sBuilder.Append( data[i].ToString( "X2" ) );
 			}
 
-			// Return the hexadecimal string.
+			// Return the hexadecimal string:
 			return sBuilder.ToString();
-		}
+
+		} // GetHash.
 
 	} // class JwtExplorations.
 	
