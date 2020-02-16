@@ -24,89 +24,146 @@ namespace Relianz.Crypto
 	using static System.Console;
 	using static System.Convert;
 
-	using System;                               // DateTime, Convert, Base64FormattingOptions, Environment
-	using System.IO;                            // File
-	using System.Text;                          // StringBuilder
-	using System.Collections.Generic;           // IEnumerable
-	using System.Security.Cryptography;         // RSACryptoServiceProvider, SHA256.
-	using System.Security.Claims;               // ClaimsIdentity, Claim
-	using System.IdentityModel.Tokens.Jwt;      // JwtSecurityTokenHandler
-	using Microsoft.IdentityModel.Tokens;       // SecurityTokenDescriptor, SigningCredentials, SymmetricSecurityKey
+	using System;									// DateTime, Convert, Base64FormattingOptions, Environment
+	using System.IO;								// File
+	using System.Text;                              // StringBuilder
+	using System.Reflection;                        // MethodBase
+	using System.Collections.Generic;				// IEnumerable
+	using System.Security.Cryptography;				// RSACryptoServiceProvider, SHA256
+	using System.Security.Claims;					// ClaimsIdentity, Claim
+	using System.IdentityModel.Tokens.Jwt;			// JwtSecurityTokenHandler
 
-	using Org.BouncyCastle.Security;            // DotNetUtilities
-	using Org.BouncyCastle.OpenSsl;             // PemReader
-	using Org.BouncyCastle.Crypto;              // AsymmetricCipherKeyPair
-	using Org.BouncyCastle.Crypto.Parameters;   // RsaPrivateCrtKeyParameters
+	using Microsoft.IdentityModel.Tokens;			// SecurityTokenDescriptor, SigningCredentials, SymmetricSecurityKey
+
+	using Org.BouncyCastle.Security;				// DotNetUtilities
+	using Org.BouncyCastle.OpenSsl;					// PemReader
+	using Org.BouncyCastle.Crypto;					// AsymmetricCipherKeyPair
+	using Org.BouncyCastle.Crypto.Parameters;       // RsaPrivateCrtKeyParameters
 
 	public class JwtExplorations
 	{
 		public static void Main()
 		{
-			string source;
-
-			// Compare SHA-256 implementations from .NET Core and in source:
-			source = "";
-			CompareSha256Implementations( source );
-
-			source = "IoT Capability - on the leading edge of technology!";
-			CompareSha256Implementations( source );
-
+			// Feature flags:
+			bool compareSHA256Implementations = false;
 			bool generateKeyPair = false;
-			RsaSecurityKey rsaKey = null;
-			int keySize = -1;
+			bool dumpRsaPrivateKey = false;
 
-			if ( generateKeyPair )
+			// Create cloud driven feature flags provider:
+			string envVar = "AzureAppConfiguration_ConnectionString";
+			string featureSet = MethodBase.GetCurrentMethod().DeclaringType.Name;
+
+			bool userAborted = false;
+			while( !userAborted )
 			{
-				// Create RSA key:
-				keySize = 2048;
-				rsaKey = GenerateRsaCryptoServiceProviderKey( keySize );
-
-				// Dump RSA key parts:
-				const string path = @"C:\Users\mstulle\source\repos\jwt\testbed\200127_RSA_PubKey.txt";
-				DumpRsaPublicKey4Python( rsaKey, path );
-				DumpRsaPublicKey( rsaKey );
-			}
-			else
-			{
-				string assetKeyPath = null;
-
-				string machine = Environment.MachineName;
-				if ( machine.Equals( "SANTACLARA" ) )
-					assetKeyPath = @"E:\temp\200131 C2 Testbed\200201 asset private key.txt";
-				else
-					assetKeyPath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
-
-				// Create RSA key from private key file:
-				rsaKey = SecurityKeyFromPemFile( assetKeyPath );
-			}
-
-			// Show private part of RSA key pair!
-			// Never do that in real world applications!
-			DumpRsaPrivateKey( rsaKey );
-
-			// Specify JWT to be signed with private key:
-			var now = DateTime.UtcNow;
-			var tokenDescriptor = new SecurityTokenDescriptor
-			{
-				Subject = new ClaimsIdentity( new[]
+				WriteLine( "\nQuery current feature flags..." );
+				Features features = Features.GetInstance( envVar, featureSet );
+				if( features != null )
 				{
-					new Claim( "email", "markus@stulle.zone" )
-				}),
-				Expires = now.AddMinutes( 60 ),
-				SigningCredentials = new SigningCredentials( rsaKey, SecurityAlgorithms.RsaSha256 ),
-			};
+					compareSHA256Implementations = features.GetFeatureFlag( "CompareSHA256Implementations" );
+					generateKeyPair = features.GetFeatureFlag( "GenerateKeyPair" );
+					dumpRsaPrivateKey = features.GetFeatureFlag( "DumpRsaPrivateKey" );
+				}
+				else
+				{
+					WriteLine( $"Cannot query feature set <{featureSet}>" );
+					WriteLine( $"Assuming default flags settings - Press any key!" );
 
-			// Generate JWT using framework class:
-			var tokenHandler = new JwtSecurityTokenHandler();
-			var token = tokenHandler.CreateToken( tokenDescriptor );
-			var tokenString = tokenHandler.WriteToken( token );
+					compareSHA256Implementations = true;
+					generateKeyPair = false;
 
-			WriteLine( "\nJWT: {0}", tokenString );
+					ReadLine();
+				}
 
-			// Validate JWT:
-			JwtSecurityToken validatedToken = ValidateJwt( tokenString, new List<SecurityKey> { rsaKey } );
-			string payload = validatedToken.Payload.SerializeToJson().ToString();
-			WriteLine( "\nJWT is valid, payload: {0}", payload );
+				// Feature enabled?
+				if( compareSHA256Implementations )
+				{
+					string source;
+
+					// Compare SHA-256 implementations from .NET Core and in source:
+					source = "";
+					CompareSha256Implementations( source );
+
+					source = "IoT Capability - on the leading edge of technology!";
+					CompareSha256Implementations( source );
+
+				} // compareSHA256Implementations.
+
+				RsaSecurityKey rsaKey = null;
+				int keySize = -1;
+
+				// Feature enabled?
+				if( generateKeyPair )
+				{
+					// Create RSA key:
+					keySize = 2048;
+					rsaKey = GenerateRsaCryptoServiceProviderKey( keySize );
+
+					// Dump RSA key parts:
+					const string path = @"C:\Users\mstulle\source\repos\jwt\testbed\200127_RSA_PubKey.txt";
+					DumpRsaPublicKey4Python( rsaKey, path );
+					DumpRsaPublicKey( rsaKey );
+				}
+				else
+				{
+					string assetKeyPath = null;
+
+					string machine = Environment.MachineName;
+					if( machine.Equals( "SANTACLARA" ))
+						assetKeyPath = @"E:\temp\200131 C2 Testbed\200201 asset private key.txt";
+					else
+						assetKeyPath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
+
+					// Create RSA key from private key file:
+					rsaKey = SecurityKeyFromPemFile( assetKeyPath );
+				}
+
+				// Feature enabled?
+				if( dumpRsaPrivateKey )
+				{
+					// Show private part of RSA key pair!
+					// Never do that in real world applications!
+					DumpRsaPrivateKey( rsaKey );
+				}
+
+				// Specify JWT to be signed with private key:
+				var now = DateTime.UtcNow;
+				var tokenDescriptor = new SecurityTokenDescriptor
+				{
+					Subject = new ClaimsIdentity( new[]
+					{
+						new Claim( "email", "markus@stulle.zone" )
+					}),
+					Expires = now.AddMinutes( 60 ),
+					SigningCredentials = new SigningCredentials( rsaKey, SecurityAlgorithms.RsaSha256 )
+				};
+
+				// Generate JWT using framework class:
+				var tokenHandler = new JwtSecurityTokenHandler();
+				var token = tokenHandler.CreateToken( tokenDescriptor );
+				var tokenString = tokenHandler.WriteToken( token );
+
+				WriteLine( "\nJWT: {0}", tokenString );
+
+				// Validate JWT:
+				JwtSecurityToken validatedToken = ValidateJwt( tokenString, new List<SecurityKey> { rsaKey } );
+				string payload = validatedToken.Payload.SerializeToJson().ToString();
+				WriteLine( "\nJWT is valid, payload: {0}", payload );
+
+				// Retry?
+				WriteLine( "Press <Esc> to abort or <Return> to retry!" );
+
+				// Prevent program from ending if <CTL+C> is pressed:
+				TreatControlCAsInput = true;
+				
+				ConsoleKeyInfo cki = ReadKey();
+				if (cki.Key == ConsoleKey.Enter)
+					userAborted = false;
+				else
+				if( cki.Key == ConsoleKey.Escape )
+					userAborted = true;
+				
+			} // while.
 
 		} // Main.
 
@@ -144,7 +201,7 @@ namespace Relianz.Crypto
 			const string pemPubKeyEnd = "\n-----END PUBLIC KEY-----";
 
 			byte[] pubKeyBytes = key.Rsa.ExportRSAPublicKey();
-			string pubKeyString = ToBase64String(pubKeyBytes, 0, pubKeyBytes.Length, Base64FormattingOptions.InsertLineBreaks);
+			string pubKeyString = ToBase64String( pubKeyBytes, 0, pubKeyBytes.Length, Base64FormattingOptions.InsertLineBreaks );
 
 			StringBuilder builder = new StringBuilder();
 			builder.Append(pemPubKeyBegin).Append(pubKeyString).Append(pemPubKeyEnd);
@@ -240,7 +297,7 @@ namespace Relianz.Crypto
 
 		public static void CompareSha256Implementations( string source )
 		{
-			Console.WriteLine( $"\nSource string to be SHA-256 hashed: <{source}>" );
+			WriteLine( $"\nSource string to be SHA-256 hashed: <{source}>" );
 
 			string hashA; 
 			string hashB;
@@ -249,12 +306,12 @@ namespace Relianz.Crypto
 			using( SHA256 sha256Hash = SHA256.Create() )
 			{
 				hashA = GetHash( sha256Hash, source );
-				Console.WriteLine( $"The .NET Core SHA256 class hash is: <{hashA}>" );
+				WriteLine( $"The .NET Core SHA256 class hash is: <{hashA}>" );
 			}
 
 			// Compute hash using in source implemenatation:
 			hashB = Sha2.GetHash( source );
-			Console.WriteLine( $"The in source implemented hash is:  <{hashB}>" );
+			WriteLine( $"The in source implemented hash is:  <{hashB}>" );
 
 		} // CompareSha256Implementations.
 
