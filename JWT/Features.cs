@@ -23,10 +23,10 @@ namespace Relianz.Crypto
 {
 	using static System.Console;
 
-	using System;                                                       // Environment, TimeSpan.
-	using System.Threading.Tasks;										// Task.
+	using System;                                                       // Environment, TimeSpan
+	using System.Threading.Tasks;                                       // Task
 
-	using Microsoft.Extensions.Configuration;							// IConfiguration
+	using Microsoft.Extensions.Configuration;                           // IConfiguration
     using Microsoft.Extensions.Configuration.AzureAppConfiguration;     // IConfigurationRefresher
 
     public class Features
@@ -57,7 +57,7 @@ namespace Relianz.Crypto
 			} // first instance 
 			else
 			{
-				// Sinleton exists, refresh local configuration cache contents:
+				// Singleton exists, refresh local configuration cache contents:
 				Task.Run( () => _refresher.Refresh() );
 			}
 
