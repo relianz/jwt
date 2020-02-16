@@ -21,12 +21,12 @@
 
 namespace Relianz.Crypto
 {
-	using static System.Console;
+    using static System.Console;
 
-	using System;                                                       // Environment, TimeSpan
-	using System.Threading.Tasks;                                       // Task
+    using System;                                                       // Environment, TimeSpan
+    using System.Threading.Tasks;                                       // Task
 
-	using Microsoft.Extensions.Configuration;                           // IConfiguration
+    using Microsoft.Extensions.Configuration;                           // IConfiguration
     using Microsoft.Extensions.Configuration.AzureAppConfiguration;     // IConfigurationRefresher
 
     public class Features
@@ -69,7 +69,8 @@ namespace Relianz.Crypto
 		public bool GetFeatureFlag( string featureFlagName )
 		{
 			string configKey = featureSet + ":Settings:" + featureFlagName;
-			string configValue = _configuration[ featureSet + ":Settings:" + featureFlagName ];
+			string configValue = _configuration[ configKey ];
+
 			if( configValue == null || configValue.Length == 0 )
 			{
 				WriteLine( $"Found null or zero length value for key <{configKey}>!" );
@@ -91,6 +92,20 @@ namespace Relianz.Crypto
 
 		} // GetFeatureFlag.
 
+		public string GetConfigurationSetting( string configurationSettingName )
+		{
+			string configKey = featureSet + ":Settings:" + configurationSettingName;
+			string configValue = _configuration[ configKey ];
+
+			if( configValue == null )
+			{
+				WriteLine( $"Found null or zero length value for key <{configKey}>!" );
+			}
+
+			return configValue;
+
+		} // GetConfigurationSetting.
+
 		public string FeatureSet { get => featureSet; }
 		public string ConnectionString { get => connectionString; }
 
@@ -111,13 +126,16 @@ namespace Relianz.Crypto
 				options.Connect( connectionString )
 						.ConfigureRefresh( refresh =>
 						{
-							refresh.Register( featureSet + ":Settings:CompareSHA256Implementations" )
+							refresh.Register( featureSet + ":Settings:" + "CompareSHA256Implementations" )
 								   .SetCacheExpiration( TimeSpan.FromSeconds( secondsConfigCacheExpiration ) );
 
-							refresh.Register( featureSet + ":Settings:GenerateKeyPair" )
+							refresh.Register( featureSet + ":Settings:" + "GenerateKeyPair" )
 								   .SetCacheExpiration( TimeSpan.FromSeconds( secondsConfigCacheExpiration ) );
 
-							refresh.Register( featureSet + ":Settings:DumpRsaPrivateKey" )
+							refresh.Register( featureSet + ":Settings:" + "DumpRsaPrivateKey" )
+								   .SetCacheExpiration( TimeSpan.FromSeconds( secondsConfigCacheExpiration ) );
+
+							refresh.Register( featureSet + ":Settings:" + "AssetPrivateKeyFilePath" )
 								   .SetCacheExpiration( TimeSpan.FromSeconds( secondsConfigCacheExpiration ) );
 						});
 
@@ -143,7 +161,7 @@ namespace Relianz.Crypto
 			await _refresher.Refresh();
 			WriteLine( _configuration[ featureSet + ":Settings:CompareSHA256Implementations" ] ?? "No value for CompareSHA256Implementations" );
 
-		} // PrintFeatures.
+		} // PrintFeature.
 
 		// Overrite default value of 30 seconds:
 		private static int secondsConfigCacheExpiration = 5;

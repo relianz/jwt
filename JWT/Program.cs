@@ -49,34 +49,54 @@ namespace Relianz.Crypto
 			bool generateKeyPair = false;
 			bool dumpRsaPrivateKey = false;
 
-			// Create cloud driven feature flags provider:
+			// Additional configuration settings: 
+			string assetPrivateKeyFilePath = null;
+
+			// Create cloud driven configuration provider:
 			string envVar = "AzureAppConfiguration_ConnectionString";
 			string featureSet = MethodBase.GetCurrentMethod().DeclaringType.Name;
 
+			int loop = 0;
 			bool userAborted = false;
 			while( !userAborted )
 			{
-				WriteLine( "\nQuery current feature flags..." );
+				loop++;
+
+				WriteLine( $"\n[{loop}] Query current configuration..." );
 				Features features = Features.GetInstance( envVar, featureSet );
 				if( features != null )
 				{
 					compareSHA256Implementations = features.GetFeatureFlag( "CompareSHA256Implementations" );
 					generateKeyPair = features.GetFeatureFlag( "GenerateKeyPair" );
 					dumpRsaPrivateKey = features.GetFeatureFlag( "DumpRsaPrivateKey" );
+
+					assetPrivateKeyFilePath = features.GetConfigurationSetting( "AssetPrivateKeyFilePath" );
 				}
 				else
 				{
 					WriteLine( $"Cannot query feature set <{featureSet}>" );
-					WriteLine( $"Assuming default flags settings - Press any key!" );
+					WriteLine( $"Assuming default configuration - Press any key!" );
 
 					compareSHA256Implementations = true;
 					generateKeyPair = false;
 
 					ReadLine();
-				}
+
+				} // configuration service accessible.
+
+				// Assert valid configuration:
+				if( assetPrivateKeyFilePath == null )
+				{
+					string machine = Environment.MachineName;
+					if( machine.Equals( "SANTACLARA" ) )
+						assetPrivateKeyFilePath = @"E:\temp\200131 C2 Testbed\200201 asset private key.txt";
+					else
+						assetPrivateKeyFilePath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
+
+				} // assetPrivateKeyFilePath == null
 
 				// Feature enabled?
-				if( compareSHA256Implementations )
+				if ( compareSHA256Implementations )
 				{
 					string source;
 
@@ -106,22 +126,14 @@ namespace Relianz.Crypto
 				}
 				else
 				{
-					string assetKeyPath = null;
-
-					string machine = Environment.MachineName;
-					if( machine.Equals( "SANTACLARA" ))
-						assetKeyPath = @"E:\temp\200131 C2 Testbed\200201 asset private key.txt";
-					else
-						assetKeyPath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
-
 					// Create RSA key from private key file:
-					rsaKey = SecurityKeyFromPemFile( assetKeyPath );
+					rsaKey = SecurityKeyFromPemFile( assetPrivateKeyFilePath );
 				}
 
 				// Feature enabled?
 				if( dumpRsaPrivateKey )
 				{
-					// Show private part of RSA key pair!
+					// Show private part of RSA key pair.
 					// Never do that in real world applications!
 					DumpRsaPrivateKey( rsaKey );
 				}
