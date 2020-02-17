@@ -54,7 +54,7 @@ namespace Relianz.Crypto
 					} // lock
 				}
 
-			} // first instance 
+			} // must create first instance. 
 			else
 			{
 				// Singleton exists, refresh local configuration cache contents:
