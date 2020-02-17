@@ -42,58 +42,16 @@ namespace Relianz.Crypto
 
 	public class JwtExplorations
 	{
-		public static void Main()
+        #region public
+        public static void Main()
 		{
-			// Feature flags:
-			bool compareSHA256Implementations = false;
-			bool generateKeyPair = false;
-			bool dumpRsaPrivateKey = false;
-
-			// Additional configuration settings: 
-			string assetPrivateKeyFilePath = null;
-
-			// Create cloud driven configuration provider:
-			string envVar = "AzureAppConfiguration_ConnectionString";
-			string featureSet = MethodBase.GetCurrentMethod().DeclaringType.Name;
-
 			int loop = 0;
 			bool userAborted = false;
 			while( !userAborted )
 			{
 				loop++;
-
 				WriteLine( $"\n[{loop}] Query current configuration..." );
-				Features features = Features.GetInstance( envVar, featureSet );
-				if( features != null )
-				{
-					compareSHA256Implementations = features.GetFeatureFlag( "CompareSHA256Implementations" );
-					generateKeyPair = features.GetFeatureFlag( "GenerateKeyPair" );
-					dumpRsaPrivateKey = features.GetFeatureFlag( "DumpRsaPrivateKey" );
-
-					assetPrivateKeyFilePath = features.GetConfigurationSetting( "AssetPrivateKeyFilePath" );
-				}
-				else
-				{
-					WriteLine( $"Cannot query feature set <{featureSet}>" );
-					WriteLine( $"Assuming default configuration - Press any key!" );
-
-					compareSHA256Implementations = true;
-					generateKeyPair = false;
-
-					ReadLine();
-
-				} // configuration service accessible.
-
-				// Assert valid configuration:
-				if( assetPrivateKeyFilePath == null )
-				{
-					string machine = Environment.MachineName;
-					if( machine.Equals( "SANTACLARA" ) )
-						assetPrivateKeyFilePath = @"E:\temp\200131 C2 Testbed\200201 asset private key.txt";
-					else
-						assetPrivateKeyFilePath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
-
-				} // assetPrivateKeyFilePath == null
+				QueryConfiguration();
 
 				// Feature enabled?
 				if ( compareSHA256Implementations )
@@ -110,16 +68,15 @@ namespace Relianz.Crypto
 				} // compareSHA256Implementations.
 
 				RsaSecurityKey rsaKey = null;
-				int keySize = -1;
 
 				// Feature enabled?
 				if( generateKeyPair )
 				{
 					// Create RSA key:
-					keySize = 2048;
+					int keySize = 2048;
 					rsaKey = GenerateRsaCryptoServiceProviderKey( keySize );
 
-					// Dump RSA key parts:
+					// Dump RSA public key in different formats:
 					const string path = @"C:\Users\mstulle\source\repos\jwt\testbed\200127_RSA_PubKey.txt";
 					DumpRsaPublicKey4Python( rsaKey, path );
 					DumpRsaPublicKey( rsaKey );
@@ -146,6 +103,7 @@ namespace Relianz.Crypto
 					{
 						new Claim( "email", "markus@stulle.zone" )
 					}),
+
 					Expires = now.AddMinutes( 60 ),
 					SigningCredentials = new SigningCredentials( rsaKey, SecurityAlgorithms.RsaSha256 )
 				};
@@ -178,8 +136,10 @@ namespace Relianz.Crypto
 			} // while.
 
 		} // Main.
+        #endregion
 
-		static private RsaSecurityKey GenerateRsaCryptoServiceProviderKey( int dwKeySize )
+        #region private
+        static private RsaSecurityKey GenerateRsaCryptoServiceProviderKey( int dwKeySize )
 		{
 			var rsaProvider = new RSACryptoServiceProvider( dwKeySize );
 			RsaSecurityKey key = new RsaSecurityKey( rsaProvider );
@@ -280,10 +240,10 @@ namespace Relianz.Crypto
 
 		} // ValidateJwt.
 
-		public static RsaSecurityKey SecurityKeyFromPemFile( String filePath )
+		private static RsaSecurityKey SecurityKeyFromPemFile( String filePath )
 		{
 			// Employ text reader to read PEM file content:
-			using (TextReader privateKeyTextReader = new StringReader( File.ReadAllText( filePath ) ) )
+			using( TextReader privateKeyTextReader = new StringReader( File.ReadAllText( filePath ) ) )
 			{
 				// Create PEM content processor from Bouncy Castle:
 				PemReader pr = new PemReader( privateKeyTextReader );
@@ -307,7 +267,7 @@ namespace Relianz.Crypto
 
 		} // SecurityKeyFromPemFile.
 
-		public static void CompareSha256Implementations( string source )
+		private static void CompareSha256Implementations( string source )
 		{
 			WriteLine( $"\nSource string to be SHA-256 hashed: <{source}>" );
 
@@ -347,6 +307,56 @@ namespace Relianz.Crypto
 
 		} // GetHash.
 
+		private static void QueryConfiguration()
+		{
+			// Access cloud driven configuration provider:
+			string envVar = "AzureAppConfiguration_ConnectionString";
+			string featureSet = MethodBase.GetCurrentMethod().DeclaringType.Name;
+
+			Features features = Features.GetInstance( envVar, featureSet );
+			if( features != null )
+			{
+				compareSHA256Implementations = features.GetFeatureFlag( "CompareSHA256Implementations" );
+				generateKeyPair = features.GetFeatureFlag( "GenerateKeyPair" );
+				dumpRsaPrivateKey = features.GetFeatureFlag( "DumpRsaPrivateKey" );
+
+				assetPrivateKeyFilePath = features.GetConfigurationSetting( "AssetPrivateKeyFilePath" );
+			}
+			else
+			{
+				WriteLine( $"Cannot query feature set <{featureSet}>" );
+				WriteLine( $"Assuming default configuration - Press any key!" );
+
+				compareSHA256Implementations = true;
+				generateKeyPair = false;
+
+				ReadLine();
+
+			} // configuration service accessible.
+
+			// Assert valid configuration:
+			if( assetPrivateKeyFilePath == null )
+			{
+				string machine = Environment.MachineName;
+				if( machine.Equals( "SANTACLARA" ) )
+					assetPrivateKeyFilePath = @"E:\temp\200131 C2 Testbed\200201 asset private key.txt";
+				else
+					assetPrivateKeyFilePath = @"C:\Users\mstulle\Documents\00 Deloitte\200131 C2 Testbed\200201 asset private key.txt";
+
+			} // assetPrivateKeyFilePath == null
+
+		} // QueryConfiguration
+
+		// Feature flags:
+		private static bool compareSHA256Implementations = false;
+		private static bool generateKeyPair = false;
+		private static bool dumpRsaPrivateKey = false;
+
+		// Additional configuration settings: 
+		private static string assetPrivateKeyFilePath = null;
+
+		#endregion
+
 	} // class JwtExplorations.
-	
+
 } // namespace Relianz.Crypto.
