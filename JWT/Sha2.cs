@@ -21,6 +21,7 @@
 
 namespace Relianz.Crypto
 {
+	using System;           // Array.
     using System.Text;      // Encoding.
 
 	/*
@@ -95,7 +96,7 @@ namespace Relianz.Crypto
 			0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
 		};
 
-		static void SHA256Transform(ref SHA256_CTX ctx, byte[] data)
+		static void SHA256Transform( ref SHA256_CTX ctx, byte[] data )
 		{
 			uint a, b, c, d, e, f, g, h, i, j, t1, t2;
 			uint[] m = new uint[64];
@@ -119,6 +120,7 @@ namespace Relianz.Crypto
 			{
 				t1 = h + EP1(e) + CH(e, f, g) + k[i] + m[i];
 				t2 = EP0(a) + MAJ(a, b, c);
+
 				h = g;
 				g = f;
 				f = e;
@@ -137,13 +139,16 @@ namespace Relianz.Crypto
 			ctx.state[5] += f;
 			ctx.state[6] += g;
 			ctx.state[7] += h;
-		}
 
-		static void SHA256Init(ref SHA256_CTX ctx)
+		} // SHA256Transform.
+
+		static void SHA256Init( ref SHA256_CTX ctx )
 		{
 			ctx.datalen = 0;
+			
 			ctx.bitlen[0] = 0;
 			ctx.bitlen[1] = 0;
+
 			ctx.state[0] = 0x6a09e667;
 			ctx.state[1] = 0xbb67ae85;
 			ctx.state[2] = 0x3c6ef372;
@@ -152,46 +157,55 @@ namespace Relianz.Crypto
 			ctx.state[5] = 0x9b05688c;
 			ctx.state[6] = 0x1f83d9ab;
 			ctx.state[7] = 0x5be0cd19;
-		}
 
-		static void SHA256Update(ref SHA256_CTX ctx, byte[] data, uint len)
+		} // SHA256Init
+
+		static void SHA256Update( ref SHA256_CTX ctx, byte[] data, uint len )
 		{
-			for (uint i = 0; i < len; ++i)
+			for( uint i = 0; i < len; ++i )
 			{
-				ctx.data[ctx.datalen] = data[i];
+				ctx.data[ ctx.datalen ] = data[ i ];
 				ctx.datalen++;
 
-				if (ctx.datalen == 64)
+				if( ctx.datalen == 64 )
 				{
-					SHA256Transform(ref ctx, ctx.data);
-					DBL_INT_ADD(ref ctx.bitlen[0], ref ctx.bitlen[1], 512);
+					SHA256Transform( ref ctx, ctx.data );
+					DBL_INT_ADD( ref ctx.bitlen[ 0 ], ref ctx.bitlen[ 1 ], 512 );
+
 					ctx.datalen = 0;
 				}
-			}
-		}
+				
+			} // for.
 
-		static void SHA256Final(ref SHA256_CTX ctx, byte[] hash)
+		} // SHA256Update.
+
+		static void SHA256Final( ref SHA256_CTX ctx, byte[] hash )
 		{
 			uint i = ctx.datalen;
 
-			if (ctx.datalen < 56)
+			// Pad whatever data is left in the buffer:
+			if ( ctx.datalen < 56 )
 			{
-				ctx.data[i++] = 0x80;
+				ctx.data[ i++ ] = 0x80;
 
-				while (i < 56)
-					ctx.data[i++] = 0x00;
+				while( i < 56 )
+					ctx.data[ i++ ] = 0x00;
 			}
 			else
 			{
-				ctx.data[i++] = 0x80;
+				ctx.data[ i++ ] = 0x80;
 
-				while (i < 64)
-					ctx.data[i++] = 0x00;
+				while( i < 64 )
+					ctx.data[ i++ ] = 0x00;
 
-				SHA256Transform(ref ctx, ctx.data);
+				SHA256Transform( ref ctx, ctx.data );
+				Array.Clear( ctx.data, 0, 56 );       // markus@stulle.zone, 20/02/20 - 18:42 CET.
 			}
 
-			DBL_INT_ADD(ref ctx.bitlen[0], ref ctx.bitlen[1], ctx.datalen * 8);
+			// Append to the padding the total message's length in bits:
+			DBL_INT_ADD( ref ctx.bitlen[0], ref ctx.bitlen[1], ctx.datalen * 8 );
+			
+			// Transform:
 			ctx.data[63] = (byte)(ctx.bitlen[0]);
 			ctx.data[62] = (byte)(ctx.bitlen[0] >> 8);
 			ctx.data[61] = (byte)(ctx.bitlen[0] >> 16);
@@ -200,13 +214,16 @@ namespace Relianz.Crypto
 			ctx.data[58] = (byte)(ctx.bitlen[1] >> 8);
 			ctx.data[57] = (byte)(ctx.bitlen[1] >> 16);
 			ctx.data[56] = (byte)(ctx.bitlen[1] >> 24);
-			SHA256Transform(ref ctx, ctx.data);
+			
+			SHA256Transform( ref ctx, ctx.data );
 
-			for (i = 0; i < 4; ++i)
+			// Since this implementation uses little endian byte ordering and SHA uses big endian,
+			// reverse all the bytes when copying the final state to the output hash.
+			for ( i = 0; i < 4; ++i )
 			{
-				hash[i] = (byte)(((ctx.state[0]) >> (int)(24 - i * 8)) & 0x000000ff);
-				hash[i + 4] = (byte)(((ctx.state[1]) >> (int)(24 - i * 8)) & 0x000000ff);
-				hash[i + 8] = (byte)(((ctx.state[2]) >> (int)(24 - i * 8)) & 0x000000ff);
+				hash[i + 0]  = (byte)((ctx.state[0] >> (int)(24 - i * 8)) & 0x000000ff);
+				hash[i + 4]  = (byte)((ctx.state[1] >> (int)(24 - i * 8)) & 0x000000ff);
+				hash[i + 8]  = (byte)((ctx.state[2] >> (int)(24 - i * 8)) & 0x000000ff);
 				hash[i + 12] = (byte)((ctx.state[3] >> (int)(24 - i * 8)) & 0x000000ff);
 				hash[i + 16] = (byte)((ctx.state[4] >> (int)(24 - i * 8)) & 0x000000ff);
 				hash[i + 20] = (byte)((ctx.state[5] >> (int)(24 - i * 8)) & 0x000000ff);
@@ -215,23 +232,24 @@ namespace Relianz.Crypto
 			}
 		}
 
-		public static string GetHash(string data)
+		public static string GetHash( string data )
 		{
 			SHA256_CTX ctx = new SHA256_CTX();
-			ctx.data = new byte[64];
-			ctx.bitlen = new uint[2];
-			ctx.state = new uint[8];
 
-			byte[] hash = new byte[32];
+			ctx.data   = new byte[ 64 ];
+			ctx.bitlen = new uint[ 2 ];
+			ctx.state  = new uint[ 8 ];
+
+			byte[] hash = new byte[ 32 ];
 			string hashStr = string.Empty;
 
-			SHA256Init(ref ctx);
-			SHA256Update(ref ctx, Encoding.Default.GetBytes(data), (uint)data.Length);
-			SHA256Final(ref ctx, hash);
+			SHA256Init( ref ctx );
+            SHA256Update( ref ctx, Encoding.Default.GetBytes( data ), (uint)data.Length );
+			SHA256Final( ref ctx, hash );
 
-			for (int i = 0; i < 32; i++)
+			for( int i = 0; i < 32; i++ )
 			{
-				hashStr += string.Format("{0:X2}", hash[i]);
+				hashStr += string.Format( "{0:X2}", hash[ i ] );
 			}
 
 			return hashStr;
