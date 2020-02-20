@@ -65,6 +65,9 @@ namespace Relianz.Crypto
 					source = "IoT Capability - on the leading edge of technology!";
 					CompareSha256Implementations( source );
 
+					source = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
+					CompareSha256Implementations( source );
+
 				} // compareSHA256Implementations.
 
 				RsaSecurityKey rsaKey = null;
@@ -269,7 +272,8 @@ namespace Relianz.Crypto
 
 		private static void CompareSha256Implementations( string source )
 		{
-			WriteLine( $"\nSource string to be SHA-256 hashed: <{source}>" );
+			int len = source.Length;
+			WriteLine( $"\nSource string to be SHA-256 hashed: <{source}> ({len})" );
 
 			string hashA; 
 			string hashB;
