@@ -27,7 +27,11 @@ namespace Relianz.Crypto
     /*
          The following source code originates from https://www.programmingalgorithms.com/algorithm/sha256/,
          see also https://tools.ietf.org/html/rfc6234.
-         Additional license restrictions might apply - check carefully before using that class in a commercial application!
+         
+         IMPORTANT: The published code contains a serious bug, which has been fixed here (see line 210)!
+         
+         Additional license restrictions might apply 
+         - check carefully before using that class definition in a commercial application!
      */
 
     /// <summary>
